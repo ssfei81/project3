@@ -8,6 +8,7 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 using namespace std;
 
@@ -82,7 +83,7 @@ void* sender(void *ptr)
             if (dest1saved)
             {
                 if(sendto(sockfd, &p, MAX_PACKET_SIZE, 0, (struct sockaddr *)&svrAddr1, len1)==-1) error("Unable to send packet.");
-                cout<<"Sending packet "<<endl;
+                cout<<"Sending packet to D1"<<endl;
                 //service delay default: 10 ms
                 usleep(10000);
             }
@@ -107,7 +108,7 @@ void* sender(void *ptr)
             if (dest2saved)
             {
                 if(sendto(sockfd, &p, MAX_PACKET_SIZE, 0, (struct sockaddr *)&svrAddr2, len2)==-1) error("Unable to send packet.");
-                cout<<"Sending packet "<<endl;
+                cout<<"Sending packet to D2"<<endl;
                 //service delay default: 10 ms
                 usleep(10000);
             }
@@ -210,6 +211,7 @@ int main(int argc, char *argv[])
 
     while(1) 
     {
+        clilen = sizeof(struct sockaddr);
         int n = recvfrom(sockfd, buf, MAX_PACKET_SIZE, 0, (struct sockaddr *)&cliAddr, &clilen);
         packet *pkt = (packet *) malloc(sizeof(packet));
         memcpy(pkt, buf, MAX_PACKET_SIZE);
@@ -218,6 +220,10 @@ int main(int argc, char *argv[])
         sumOfQ1 += p_queue1.size();
         sumOfQ2 += p_queue2.size();
         cout<<sumOfQ1<<" "<<sumOfQ2<<endl;
+
+        strcpy(pkt->sourceIP, inet_ntoa(cliAddr.sin_addr));
+        pkt->sourcePort = ntohs(cliAddr.sin_port);
+
         if(mode == 0 || mode == 1) 
         {
             int n = p_queue1.add(pkt);

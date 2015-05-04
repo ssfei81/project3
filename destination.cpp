@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
     cout<<"************************************"<<endl;
     cout<<"*** Welcome to EE 122 Project #2 ***"<<endl;
     cout<<"***     Shuo Sun and Gabriel     ***"<<endl;
-    cout<<"***        Router Program        ***"<<endl;
+    cout<<"***        Destination Program   ***"<<endl;
     cout<<"************************************"<<endl; 
     cout<<"(ctrl + c to exit)"<<endl;
 
@@ -79,6 +79,10 @@ int main(int argc, char *argv[])
     //project 3 delay
     struct timeval start;
     struct timeval end;
+    socklen_t alen;
+    struct sockaddr_in ackAddr;
+    struct hostent *ack;   
+    int saved = 0;
     //----------------------
 
    while(1) 
@@ -112,6 +116,31 @@ int main(int argc, char *argv[])
         //cout<<delay<<endl;
         delaySum += delay;
         //cout<<delaySum<<endl;
+        
+        //project 3 - send back ACKs
+        //construct ACK packet
+        packet *pkt = (packet *) malloc(sizeof(packet));
+        memcpy(pkt, buf, MAX_PACKET_SIZE);
+        ackpacket p2;  
+        p2.sequenceNumber = pkt->sequenceNumber;
+        p2.tv = pkt->tv;
+        
+        //send back ack
+
+        if(!saved){
+        ack = gethostbyname(pkt->sourceIP);
+        bzero((char *) &ackAddr, sizeof(ackAddr));
+        ackAddr.sin_family = AF_INET;
+        ackAddr.sin_port = htons(pkt->sourcePort);
+        bcopy((char *)ack->h_addr,
+                (char *)&ackAddr.sin_addr.s_addr,
+                ack->h_length);
+        alen = sizeof(ackAddr);
+        saved = 1;
+        }
+        cout<<p2.sequenceNumber<<endl;
+        if(sendto(sockfd, &p2, MAX_PACKET_SIZE, 0, (struct sockaddr *)&ackAddr, alen)==-1) error("Unable to send packet");
+        cout<<"ACK sent to "<<pkt->sourceIP<<":"<<pkt->sourcePort<<endl;
 
     //-------------------------
     //project 3 delay
@@ -128,7 +157,7 @@ unsigned long long e_time = (unsigned long long)(end.tv_sec)*1000 + (unsigned lo
         else b = 5;
         timer = 0;
     }
-    cout<<timer<<"("<<b<<")"<<endl;
+    //cout<<timer<<"("<<b<<")"<<endl;
     //------------------------
 
     }

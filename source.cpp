@@ -8,8 +8,17 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <random>
+#include <pthread.h>
 #include "packet.h"
 using namespace std;
+
+#define WINDOW_SIZE 100
+int window_start = 1, window_end = WINDOW_SIZE, resend = 0;
+struct timeval startTime;
+int sockfd;
+char buf[MAX_PACKET_SIZE]; 
+struct sockaddr_in svrAddr, cliAddr;
+socklen_t clilen;
 
 void error(char *msg) 
 {
@@ -33,10 +42,73 @@ void errorMsg(char *msg)
     exit(1);
 }
 
+void* receiver(void *ptr)
+{
+    gettimeofday(&startTime, NULL);
+    unsigned long long msSinceEpoch =
+       (unsigned long long)(startTime.tv_sec) * 1000 +
+          (unsigned long long)(startTime.tv_usec) / 1000;
+
+while(1){
+    //timeout for recvfrom
+    struct timeval to;
+    
+    to.tv_sec = 2;
+    to.tv_usec = 0;
+    
+    setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&to,sizeof(struct timeval));
+    
+    clilen = sizeof(struct sockaddr);
+    int n = recvfrom(sockfd, buf, MAX_PACKET_SIZE, 0,(struct sockaddr *)&cliAddr, &clilen);
+    ackpacket *pkt = (ackpacket *)&buf;
+    
+    struct timeval tv;
+    
+    float timeout, a_n, d_n, b;
+    b = 0.8; //algorithm parameter
+    bool start = false;
+    //loop start
+    gettimeofday(&tv, NULL);
+    unsigned long long msSinceEpoch =
+    (unsigned long long)(tv.tv_sec) * 1000 +
+    (unsigned long long)(tv.tv_usec) / 1000;
+    
+    unsigned long long msSinceEpoch2 =
+    (unsigned long long)(pkt->tv.tv_sec) * 1000 +
+    (unsigned long long)(pkt->tv.tv_usec) / 1000;
+    
+    unsigned long long delay = msSinceEpoch - msSinceEpoch2;
+    
+    //if delay < time out
+    if(delay < timeout) {
+        if(pkt->sequenceNumber == window_start) {window_start++; window_end++;}
+        else resend = 1;
+        }
+    
+    if (!start)
+        {
+        a_n = delay;
+        d_n = delay;
+        start = true;
+        }
+    else
+        {
+        a_n = (1-b) * a_n + b * delay;
+        d_n = (1-b) * d_n + b * (delay - a_n);
+        }
+    
+    timeout = a_n + 4 * d_n;
+    }
+}
+
 int main(int argc, char *argv[]) 
 {
+    //project 3 thread var
+    //
+    pthread_t receiver_thread;
+
     //socket stuff
-    int sockfd, portno, destportno;
+    int portno, destportno;
     socklen_t len;
     struct sockaddr_in svrAddr, cliAddr;
     struct hostent *server;
@@ -112,9 +184,22 @@ int main(int argc, char *argv[])
 
     len = sizeof(svrAddr);
 
+    //project 3
+    //new thread for receiving ACKs
+    if(senderID==2){
+    pthread_create(&receiver_thread,NULL, receiver, NULL);
+    } 
+
     //start sending packets
     for (int x = 1; x <= packetCount; x++)
     {
+       if(senderID == 2){
+           while(x > window_end){
+        //busy wait
+            if(resend) {x = window_start; resend = 0;}
+        }
+        }
+
         //construct a packet
         packet p;
         p.sequenceNumber = x;
