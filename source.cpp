@@ -9,11 +9,16 @@
 #include <netdb.h>
 #include <random>
 #include <pthread.h>
+#include <cstdio>
+#include <ctime>
 #include "packet.h"
 using namespace std;
 
 #define WINDOW_SIZE 8
 int window_start = 1, window_end = WINDOW_SIZE, resend = 0;
+bool receiverStart = false;
+
+int mode = 1; // 0: Step 1, 1: Step 2
 struct timeval startTime;
 int sockfd;
 char buf[MAX_PACKET_SIZE]; 
@@ -65,9 +70,7 @@ while(1){
     struct timeval tv;
     
     float timeout, a_n, d_n, b;
-    b = 0.8; //algorithm parameter
-    bool start = false;
-    //loop start
+    b = 0.5; //algorithm parameter
     gettimeofday(&tv, NULL);
     unsigned long long msSinceEpoch =
     (unsigned long long)(tv.tv_sec) * 1000 +
@@ -77,28 +80,40 @@ while(1){
     (unsigned long long)(pkt->tv.tv_sec) * 1000 +
     (unsigned long long)(pkt->tv.tv_usec) / 1000;
     
-    unsigned long long delay = msSinceEpoch - msSinceEpoch2;
-   
+    float delay = msSinceEpoch - msSinceEpoch2;
+    
     //if delay < time out
     //cout<<delay<<" "<<timeout<<endl;
-    if(delay < 2 * timeout) {
+    if(delay < timeout) 
+    {
         if(pkt->sequenceNumber == window_start) {window_start++; window_end++;}
         else if (pkt->sequenceNumber > window_start) resend = 1;
-        }
+        //increase window size
+        if (mode == 1) window_end++; 
+    }
+    else
+    {
+        resend = 1;
+        // half window size
+        if (mode == 1) window_end = window_start + int((window_end - window_start) / 2);
+    }
+
     
-    if (!start)
+    if (!receiverStart)
         {
-        a_n = delay;
-        d_n = delay;
-        start = true;
+        a_n = float(delay);
+        d_n = float(delay);
+        receiverStart = true;
         }
     else
         {
-        a_n = (1-b) * a_n + b * delay;
-        d_n = (1-b) * d_n + b * (delay - a_n);
+        a_n = (1-b) * a_n + b * (float)delay;
+        d_n = (1-b) * d_n + b * (float(delay) - a_n);
         }
     
     timeout = a_n + 4 * d_n;
+    cout<<"timeout "<<timeout<<endl;
+    cout<<"delay "<<delay<<endl;
     }
 }
 
@@ -115,6 +130,10 @@ int main(int argc, char *argv[])
     struct hostent *server;
     float delay;
     int senderID, receiverID, packetCount;
+
+    std::clock_t start;
+    double duration;
+    bool sendToggle = true;
 
     cout<<"************************************"<<endl;
     cout<<"*** Welcome to EE 122 Project #2 ***"<<endl;
@@ -190,6 +209,8 @@ int main(int argc, char *argv[])
     if(senderID==2){
     pthread_create(&receiver_thread,NULL, receiver, NULL);
     } 
+    //start clock for mode 1 source 1 
+    start = std::clock();
 
     //start sending packets
     for (int x = 1; x <= packetCount; x++)
@@ -200,24 +221,43 @@ int main(int argc, char *argv[])
             if(resend) {x = window_start; resend = 0;}
         }
         }
-
         //construct a packet
-        packet p;
-        p.sequenceNumber = x;
-        p.source = senderID;
-        p.destination = receiverID;
-        strcpy(p.destinationIP, argv[5]);
-        p.destinationPort = destportno;
-        gettimeofday(&p.tv, NULL);
+        if (sendToggle) 
+        {
+            packet p;
+            p.sequenceNumber = x;
+            p.source = senderID;
+            p.destination = receiverID;
+            strcpy(p.destinationIP, argv[5]);
+            p.destinationPort = destportno;
+            gettimeofday(&p.tv, NULL);
 
-        unsigned long long msSinceEpoch =
-                (unsigned long long)(p.tv.tv_sec) * 1000 +
-                    (unsigned long long)(p.tv.tv_usec) / 1000;
+            unsigned long long msSinceEpoch =
+                    (unsigned long long)(p.tv.tv_sec) * 1000 +
+                        (unsigned long long)(p.tv.tv_usec) / 1000;
 
-        if(sendto(sockfd, &p, MAX_PACKET_SIZE, 0, (struct sockaddr *)&svrAddr, len)==-1) error("Unable to send packet.");
-        cout<<"Sending packet "<<x<<endl;
-        //delay 
-        usleep((int) distribution(generator) * 1000);
+            if(sendto(sockfd, &p, MAX_PACKET_SIZE, 0, (struct sockaddr *)&svrAddr, len)==-1) error("Unable to send packet.");
+            cout<<"Sending packet "<<x<<endl;
+            //delay 
+            usleep((int) distribution(generator) * 1000);
+        }
+        if (mode == 1 && senderID == 1)
+        {
+            if (!sendToggle)
+            {
+                sleep(5);
+                sendToggle = true;
+                start = std::clock();
+            }
+            duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
+
+            if (duration > 0.1) sendToggle = false;
+        }
+        // cout<<duration<<endl;
+        cout<<"start "<<window_start<<endl;
+        cout<<"windowsize "<<window_end - window_start<<endl;
+        
+        
     }
     return 0;
 }
