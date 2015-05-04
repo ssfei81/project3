@@ -111,7 +111,7 @@ while(1){
     else
         {
         a_n = (1-b) * a_n + b * (float)delay;
-        d_n = (1-b) * d_n + b * (float(delay) - a_n);
+        d_n = (1-b) * d_n + b * abs((float(delay) - a_n));
         }
     
     timeout = a_n + 4 * d_n;
