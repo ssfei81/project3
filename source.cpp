@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <cstring>
 #include <pthread.h>
 #include <sys/socket.h>
@@ -12,13 +13,14 @@
 #include "packet.h"
 using namespace std;
 
-#define WINDOW_SIZE 8
+#define WINDOW_SIZE 5
 int window_start = 1, window_end = WINDOW_SIZE, resend = 0;
 struct timeval startTime;
 int sockfd;
 char buf[MAX_PACKET_SIZE]; 
 struct sockaddr_in svrAddr, cliAddr;
 socklen_t clilen;
+ofstream fout("timeout");
 
 void error(char *msg) 
 {
@@ -45,7 +47,7 @@ void errorMsg(char *msg)
 void* receiver(void *ptr)
 {
     gettimeofday(&startTime, NULL);
-    unsigned long long msSinceEpoch =
+    unsigned long long msSinceEpoch3 =
        (unsigned long long)(startTime.tv_sec) * 1000 +
           (unsigned long long)(startTime.tv_usec) / 1000;
 
@@ -76,15 +78,17 @@ while(1){
     unsigned long long msSinceEpoch2 =
     (unsigned long long)(pkt->tv.tv_sec) * 1000 +
     (unsigned long long)(pkt->tv.tv_usec) / 1000;
-    
+     
     unsigned long long delay = msSinceEpoch - msSinceEpoch2;
-   
+    
+    fout<<timeout<<" "<<(msSinceEpoch - msSinceEpoch3)<<endl;
     //if delay < time out
     //cout<<delay<<" "<<timeout<<endl;
     if(delay < 2 * timeout) {
         if(pkt->sequenceNumber == window_start) {window_start++; window_end++;}
-        else if (pkt->sequenceNumber > window_start) resend = 1;
+        //else if (pkt->sequenceNumber > window_start) resend = 1;
         }
+    else{ resend = 1;}
     
     if (!start)
         {
@@ -190,7 +194,7 @@ int main(int argc, char *argv[])
     if(senderID==2){
     pthread_create(&receiver_thread,NULL, receiver, NULL);
     } 
-
+    int totalAttempts = 0;
     //start sending packets
     for (int x = 1; x <= packetCount; x++)
     {
@@ -200,6 +204,7 @@ int main(int argc, char *argv[])
             if(resend) {x = window_start; resend = 0;}
         }
         }
+       totalAttempts++;
 
         //construct a packet
         packet p;
@@ -219,5 +224,8 @@ int main(int argc, char *argv[])
         //delay 
         usleep((int) distribution(generator) * 1000);
     }
+    cout<<"Number of packets received: "<<packetCount<<endl;
+    cout<<"Number of attempts: "<<totalAttempts<<endl;
+    cout<<"Efficiency: "<<(float) packetCount/ (float) totalAttempts<<endl;
     return 0;
 }
