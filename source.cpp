@@ -12,7 +12,7 @@
 #include "packet.h"
 using namespace std;
 
-#define WINDOW_SIZE 100
+#define WINDOW_SIZE 8
 int window_start = 1, window_end = WINDOW_SIZE, resend = 0;
 struct timeval startTime;
 int sockfd;
@@ -78,11 +78,12 @@ while(1){
     (unsigned long long)(pkt->tv.tv_usec) / 1000;
     
     unsigned long long delay = msSinceEpoch - msSinceEpoch2;
-    
+   
     //if delay < time out
-    if(delay < timeout) {
+    //cout<<delay<<" "<<timeout<<endl;
+    if(delay < 2 * timeout) {
         if(pkt->sequenceNumber == window_start) {window_start++; window_end++;}
-        else resend = 1;
+        else if (pkt->sequenceNumber > window_start) resend = 1;
         }
     
     if (!start)

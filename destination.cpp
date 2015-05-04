@@ -138,7 +138,6 @@ int main(int argc, char *argv[])
         alen = sizeof(ackAddr);
         saved = 1;
         }
-        cout<<p2.sequenceNumber<<endl;
         if(sendto(sockfd, &p2, MAX_PACKET_SIZE, 0, (struct sockaddr *)&ackAddr, alen)==-1) error("Unable to send packet");
         cout<<"ACK sent to "<<pkt->sourceIP<<":"<<pkt->sourcePort<<endl;
 
