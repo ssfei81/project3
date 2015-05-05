@@ -213,7 +213,9 @@ int main(int argc, char *argv[])
     pthread_create(&receiver_thread,NULL, receiver, NULL);
     } 
     //start clock for mode 1 source 1 
-    start = std::clock();
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    
     int totalAttempts = 0;
     //start sending packets
     for (int x = 1; x <= packetCount; x++)
@@ -252,13 +254,21 @@ int main(int argc, char *argv[])
             {
                 sleep(5);
                 sendToggle = true;
-                start = std::clock();
+                gettimeofday(&tv, NULL);
             }
-            duration = ( std::clock() - start ) / (double) CLOCKS_PER_SEC;
+            struct timeval tvNow;
+            gettimeofday(&tvNow, NULL);
+            unsigned long long msSinceEpoch =
+                (unsigned long long)(tv.tv_sec) * 1000 +
+                (unsigned long long)(tv.tv_usec) / 1000;
+            unsigned long long msSinceEpochFromNow =
+                (unsigned long long)(tvNow.tv_sec) * 1000 +
+                (unsigned long long)(tvNow.tv_usec) / 1000;
+            duration = msSinceEpochFromNow - msSinceEpoch;
 
-            if (duration > 0.1) sendToggle = false;
+            if (duration > 5000) sendToggle = false;
         }
-        // cout<<duration<<endl;
+        cout<<duration<<endl;
         cout<<"start "<<window_start<<endl;
         cout<<"windowsize "<<window_end - window_start<<endl;
         
