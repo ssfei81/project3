@@ -15,17 +15,17 @@
 #include "packet.h"
 using namespace std;
 
-#define WINDOW_SIZE 5
+#define WINDOW_SIZE 10
 int window_start = 1, window_end = WINDOW_SIZE, resend = 0;
 bool receiverStart = false;
 
-int mode = 1; // 0: Step 1, 1: Step 2
+int mode = 0; // 0: Step 1, 1: Step 2
 struct timeval startTime;
 int sockfd;
 char buf[MAX_PACKET_SIZE]; 
 struct sockaddr_in svrAddr, cliAddr;
 socklen_t clilen;
-ofstream fout("timeout");
+ofstream fout("timeout.txt");
 
 void error(char *msg) 
 {
@@ -84,7 +84,7 @@ while(1){
     
     float delay = msSinceEpoch - msSinceEpoch2;
     
-    fout<<timeout<<" "<<(msSinceEpoch - msSinceEpoch3)<<endl;
+    fout<<(float)timeout/1000<<" "<<(float)(msSinceEpoch - msSinceEpoch3)/1000<<endl;
     //if delay < time out
     //cout<<delay<<" "<<timeout<<endl;
     if(delay < timeout) 
