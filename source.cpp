@@ -16,16 +16,16 @@
 using namespace std;
 
 #define WINDOW_SIZE 10
+
 int window_start = 1, window_end = WINDOW_SIZE, resend = 0;
 bool receiverStart = false;
-
-int mode = 0; // 0: Step 1, 1: Step 2
+int mode;
 struct timeval startTime;
 int sockfd;
 char buf[MAX_PACKET_SIZE]; 
 struct sockaddr_in svrAddr, cliAddr;
 socklen_t clilen;
-ofstream fout("timeout.txt");
+ofstream fout("efficiency.txt");
 
 void error(char *msg) 
 {
@@ -45,6 +45,7 @@ void errorMsg(char *msg)
     cout<<"<destination addr> The IP address of the receiver."<<endl;
     cout<<"<destination port> The port number of the receiver."<<endl;
     cout<<"<packet_count> How many packets to be sent."<<endl;
+    cout<<"<mode> The mode which decides whether AIMD is used."<<endl;
     cout<<endl;
     exit(1);
 }
@@ -83,8 +84,10 @@ while(1){
     (unsigned long long)(pkt->tv.tv_usec) / 1000;
     
     float delay = msSinceEpoch - msSinceEpoch2;
+
+    cout<<window_end - window_start<<" "<<(float)(msSinceEpoch - msSinceEpoch3)/1000<<endl;
     
-    fout<<(float)timeout/1000<<" "<<(float)(msSinceEpoch - msSinceEpoch3)/1000<<endl;
+    // fout<<(float)timeout/1000<<" "<<(float)(msSinceEpoch - msSinceEpoch3)/1000<<endl;
     //if delay < time out
     //cout<<delay<<" "<<timeout<<endl;
     if(delay < timeout) 
@@ -115,8 +118,8 @@ while(1){
         }
     
     timeout = a_n + 4 * d_n;
-    cout<<"timeout "<<timeout<<endl;
-    cout<<"delay "<<delay<<endl;
+    // cout<<"timeout "<<timeout<<endl;
+    // cout<<"delay "<<delay<<endl;
     }
 }
 
@@ -146,7 +149,7 @@ int main(int argc, char *argv[])
     cout<<"(ctrl + c to exit)"<<endl;
 
     //read from command line
-    if (argc != 8) errorMsg("Invalid input format"); 
+    if (argc != 9) errorMsg("Invalid input format"); 
 
     server = gethostbyname(argv[1]);
     if(server==NULL) error("Incorrect server address.");
@@ -176,6 +179,8 @@ int main(int argc, char *argv[])
     packetCount = atoi(argv[7]);
     if(packetCount <= 0) error("Packet count must be greater than 0.");
     cout<<"Packet count: "<<packetCount<<endl<<endl;
+
+    mode = atoi(argv[8]);
 
     //initialize program
     cout<<"Starting source program..."<<endl;
@@ -244,7 +249,7 @@ int main(int argc, char *argv[])
                         (unsigned long long)(p.tv.tv_usec) / 1000;
 
             if(sendto(sockfd, &p, MAX_PACKET_SIZE, 0, (struct sockaddr *)&svrAddr, len)==-1) error("Unable to send packet.");
-            cout<<"Sending packet "<<x<<endl;
+            // cout<<"Sending packet "<<x<<endl;
             //delay 
             usleep((int) distribution(generator) * 1000);
         }
@@ -268,14 +273,26 @@ int main(int argc, char *argv[])
 
             if (duration > 5000) sendToggle = false;
         }
-        cout<<duration<<endl;
-        cout<<"start "<<window_start<<endl;
-        cout<<"windowsize "<<window_end - window_start<<endl;
+
+    struct timeval tv; 
+    gettimeofday(&tv, NULL);
+    unsigned long long msSinceEpoch =
+    (unsigned long long)(tv.tv_sec) * 1000 +
+    (unsigned long long)(tv.tv_usec) / 1000;
+    unsigned long long msSinceEpoch3 =
+       (unsigned long long)(startTime.tv_sec) * 1000 +
+          (unsigned long long)(startTime.tv_usec) / 1000;
+        // cout<<duration<<endl;
+        // cout<<"start "<<window_start<<endl;
+        // cout<<"windowsize "<<window_end - window_start<<endl;
+
+        // cout<<(float) window_start/ (float) totalAttempts<<" "<<(float)(msSinceEpoch - msSinceEpoch3)/1000<<endl;
+
         
         
     }
-    cout<<"Number of packets received: "<<packetCount<<endl;
-    cout<<"Number of attempts: "<<totalAttempts<<endl;
-    cout<<"Efficiency: "<<(float) packetCount/ (float) totalAttempts<<endl;
+    // cout<<"Number of packets received: "<<packetCount<<endl;
+    // cout<<"Number of attempts: "<<totalAttempts<<endl;
+    // cout<<"Efficiency: "<<(float) packetCount/ (float) totalAttempts<<endl;
     return 0;
 }
