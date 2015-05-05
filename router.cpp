@@ -1,6 +1,7 @@
 #include "queue.h"
 #include "packet.h"
 #include <iostream>
+#include <fstream>
 #include <cstring>
 #include <cstdlib>
 #include <unistd.h>
@@ -14,6 +15,8 @@ using namespace std;
 
 #define BUFFER_LIMIT 64
 #define MAX_BUFFER_SIZE 200
+
+ofstream fout("load.txt");
 
 //initialize the queues
 queue<packet *> p_queue1(BUFFER_LIMIT); 
@@ -48,6 +51,13 @@ void errorMsg(char *msg)
 
 void* sender(void *ptr) 
 {
+struct timeval startTime;
+struct timeval tv;
+
+gettimeofday(&startTime, NULL);
+    unsigned long long msSinceEpoch3 =
+               (unsigned long long)(startTime.tv_sec) * 1000 +
+                         (unsigned long long)(startTime.tv_usec) / 1000;
     //socket stuff
     socklen_t len1, len2;
     struct sockaddr_in svrAddr1, svrAddr2;
@@ -60,6 +70,12 @@ void* sender(void *ptr)
         
     while(1) 
     {
+        gettimeofday(&tv, NULL);
+            unsigned long long msSinceEpoch =
+                  (unsigned long long)(tv.tv_sec) * 1000 +
+                            (unsigned long long)(tv.tv_usec) / 1000;
+        float time = (float) (msSinceEpoch - msSinceEpoch3)/1000;
+        fout<<p_queue1.size()<<" "<<p_queue2.size()<<" "<<time<<endl;
         if (mode == 0 || mode == 1)
         {
             p = *p_queue1.pop();
